@@ -65,7 +65,6 @@ class AudioSessionManager {
             configureAudioSession()
         } 
     }
-    }
 
     // Handle remote control events from NowPlayingInfoCenterManager
     func setRemoteControlEventsActive(_ active: Bool) {
