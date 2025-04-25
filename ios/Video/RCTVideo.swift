@@ -868,9 +868,6 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                     _imaAdsManager.getAdsManager()?.resume()
                 #endif
             } else {
-                if _lastPlaybackRate < 0 {
-                    _lastPlaybackRate = 0
-                }
                 
                 if #available(iOS 10.0, *), !_automaticallyWaitsToMinimizeStalling {
                     _player?.playImmediately(atRate: _rate)
