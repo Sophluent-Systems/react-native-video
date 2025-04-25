@@ -212,64 +212,6 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             }
         #endif
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(applicationWillResignActive(notification:)),
-            name: UIApplication.willResignActiveNotification,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(applicationDidBecomeActive(notification:)),
-            name: UIApplication.didBecomeActiveNotification,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(applicationDidEnterBackground(notification:)),
-            name: UIApplication.didEnterBackgroundNotification,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(applicationWillEnterForeground(notification:)),
-            name: UIApplication.willEnterForegroundNotification,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(screenWillLock),
-            name: UIApplication.protectedDataWillBecomeUnavailableNotification,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(screenDidUnlock),
-            name: UIApplication.protectedDataDidBecomeAvailableNotification,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(audioRouteChanged(notification:)),
-            name: AVAudioSession.routeChangeNotification,
-            object: nil
-        )
-
-        #if os(iOS)
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(handleRotation),
-                name: UIDevice.orientationDidChangeNotification,
-                object: nil
-            )
-        #endif
-
         _playerObserver._handlers = self
         #if USE_VIDEO_CACHING
             _videoCache.playerItemPrepareText = playerItemPrepareText
@@ -290,7 +232,11 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         #endif
         AudioSessionManager.shared.unregisterView(view: self)
 
+        // Use our specific cleanup method first
+        cleanupNotificationObservers()
+        // Then remove any remaining observers
         NotificationCenter.default.removeObserver(self)
+        
         self.removePlayerLayer()
         _playerObserver.clearPlayer()
 
@@ -558,6 +504,9 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 // We need to register player after we set current item and only for init
                 NowPlayingInfoCenterManager.shared.registerPlayer(player: _player!)
             }
+            
+            // Add notification observers when player is initialized
+            setupNotificationObservers()
         } else {
             #if !os(tvOS) && !os(visionOS)
                 if #available(iOS 16.0, *) {
@@ -596,6 +545,67 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         applyNextSource()
     }
 
+    // Add a new method to set up notification observers
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationWillResignActive(notification:)),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidBecomeActive(notification:)),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidEnterBackground(notification:)),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationWillEnterForeground(notification:)),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenWillLock),
+            name: UIApplication.protectedDataWillBecomeUnavailableNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenDidUnlock),
+            name: UIApplication.protectedDataDidBecomeAvailableNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(audioRouteChanged(notification:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+
+        #if os(iOS)
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleRotation),
+                name: UIDevice.orientationDidChangeNotification,
+                object: nil
+            )
+        #endif
+    }
+
     @objc
     func setSrc(_ source: NSDictionary!) {
         if self.isSetSourceOngoing || self.nextSource != nil {
@@ -616,7 +626,11 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 if let player = self._player {
                     NowPlayingInfoCenterManager.shared.removePlayer(player: player)
                 }
-
+                
+                // Remove notification observers when source is nullified
+                // to ensure audio engine and observer lifecycle are in sync
+                self.cleanupNotificationObservers()
+                
                 DebugLog("setSrc Stopping playback")
                 return
             }
@@ -652,6 +666,30 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         }
 
         DispatchQueue.global(qos: .default).async(execute: initializeSource)
+    }
+
+    // Add a helper method to clean up notification observers
+    private func cleanupNotificationObservers() {
+        // Remove all notification observers related to audio session and playback
+        NotificationCenter.default.removeObserver(
+            self,
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.removeObserver(
+            self,
+            name: AVAudioSession.routeChangeNotification, 
+            object: nil
+        )
+        
+        #if os(iOS)
+            NotificationCenter.default.removeObserver(
+                self,
+                name: UIDevice.orientationDidChangeNotification,
+                object: nil
+            )
+        #endif
     }
 
     func playerItemPrepareText(source: VideoSource, asset: AVAsset!, assetOptions: NSDictionary?, uri: String) async -> AVPlayerItem {
@@ -807,6 +845,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
     @objc
     func setPaused(_ paused: Bool) {
+        guard _player != nil else { return }
         if paused {
             if _adPlaying {
                 #if USE_GOOGLE_IMA
@@ -814,7 +853,14 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 #endif
             } else {
                 _player?.pause()
-                _player?.rate = 0.0
+                if _playerViewController == nil || !_controls {
+                    _player?.rate = 0.0
+                }
+            }
+            
+            // When explicitly paused, ensure audio session is updated
+            if self._player?.rate == 0 {
+                AudioSessionManager.shared.playerPropertiesChanged(view: self)
             }
         } else {
             if _adPlaying {
@@ -822,18 +868,23 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                     _imaAdsManager.getAdsManager()?.resume()
                 #endif
             } else {
+                if _lastPlaybackRate < 0 {
+                    _lastPlaybackRate = 0
+                }
+                
                 if #available(iOS 10.0, *), !_automaticallyWaitsToMinimizeStalling {
                     _player?.playImmediately(atRate: _rate)
                 } else {
                     _player?.play()
                     _player?.rate = _rate
                 }
-                _player?.rate = _rate
             }
+            
+            // When resuming playback, ensure audio session is updated
+            AudioSessionManager.shared.playerPropertiesChanged(view: self)
         }
-
+        
         _paused = paused
-        AudioSessionManager.shared.playerPropertiesChanged(view: self)
     }
 
     @objc
@@ -1392,7 +1443,11 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         }
 
         _eventDispatcher = nil
-        // swiftlint:disable:next notification_center_detachment
+        
+        // Use our method to clean up notification observers
+        cleanupNotificationObservers()
+        
+        // Still remove any remaining observers as a safety net
         NotificationCenter.default.removeObserver(self)
 
         super.removeFromSuperview()
