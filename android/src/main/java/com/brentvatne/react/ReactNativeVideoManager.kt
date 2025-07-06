@@ -2,6 +2,8 @@ package com.brentvatne.react
 
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DataSource
+import androidx.media3.exoplayer.drm.DrmSessionManager
+import androidx.media3.exoplayer.source.MediaSource
 import com.brentvatne.common.api.Source
 import com.brentvatne.common.toolbox.DebugLog
 import com.brentvatne.exoplayer.DRMManagerSpec
@@ -78,11 +80,31 @@ class ReactNativeVideoManager : RNVPlugin {
     // ----------------------- RNV Exoplayer plugin specific methods -----------------------
     fun getDRMManager(): DRMManagerSpec? = customDRMManager
 
+    fun overrideDrmSessionManager(source: Source, drmSessionManager: DrmSessionManager): DrmSessionManager? {
+        for (plugin in pluginList) {
+            if (plugin !is RNVExoplayerPlugin) continue
+
+            val overriddenManager = plugin.overrideDrmSessionManager(source, drmSessionManager)
+            if (overriddenManager != null) return overriddenManager
+        }
+        return null
+    }
+
     fun overrideMediaDataSourceFactory(source: Source, mediaDataSourceFactory: DataSource.Factory): DataSource.Factory? {
         for (plugin in pluginList) {
             if (plugin !is RNVExoplayerPlugin) continue
 
             val factory = plugin.overrideMediaDataSourceFactory(source, mediaDataSourceFactory)
+            if (factory != null) return factory
+        }
+        return null
+    }
+
+    fun overrideMediaSourceFactory(source: Source, mediaSourceFactory: MediaSource.Factory, mediaDataSourceFactory: DataSource.Factory): MediaSource.Factory? {
+        for (plugin in pluginList) {
+            if (plugin !is RNVExoplayerPlugin) continue
+
+            val factory = plugin.overrideMediaSourceFactory(source, mediaSourceFactory, mediaDataSourceFactory)
             if (factory != null) return factory
         }
         return null

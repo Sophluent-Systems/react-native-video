@@ -3,6 +3,8 @@ package com.brentvatne.exoplayer
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.drm.DrmSessionManager
+import androidx.media3.exoplayer.source.MediaSource
 import com.brentvatne.common.api.Source
 import com.brentvatne.react.RNVPlugin
 
@@ -19,6 +21,15 @@ interface RNVExoplayerPlugin : RNVPlugin {
     fun getDRMManager(): DRMManagerSpec? = null
 
     /**
+     * Optional function that allows the plugin to override the DrmSessionManager after it has been created.
+     * This is called after buildDrmSessionManager and allows for final modifications to the DrmSessionManager.
+     * @param source The media source being initialized.
+     * @param drmSessionManager The current DrmSessionManager instance.
+     * @return A modified DrmSessionManager if override is needed, or null to use original.
+     */
+    fun overrideDrmSessionManager(source: Source, drmSessionManager: DrmSessionManager): DrmSessionManager? = null
+
+    /**
      * Optional function that allows the plugin to override the media data source factory,
      * which is responsible for loading media data.
      * @param source The media source being initialized.
@@ -26,6 +37,17 @@ interface RNVExoplayerPlugin : RNVPlugin {
      * @return A custom [DataSource.Factory] if override is needed, or null to use default.
      */
     fun overrideMediaDataSourceFactory(source: Source, mediaDataSourceFactory: DataSource.Factory): DataSource.Factory? = null
+
+    /**
+     * Optional function that allows the plugin to override the media source factory,
+     * which is responsible for loading media data.
+     * @param source The media source being initialized.
+     * @param mediaSourceFactory The current media source factory.
+     * @param mediaDataSourceFactory The current default data source factory.
+     * @return A custom [MediaSource.Factory] if override is needed, or null to use default.
+     */
+    fun overrideMediaSourceFactory(source: Source, mediaSourceFactory: MediaSource.Factory, mediaDataSourceFactory: DataSource.Factory): MediaSource.Factory? =
+        null
 
     /**
      * Optional function that allows the plugin to modify the [MediaItem.Builder]
